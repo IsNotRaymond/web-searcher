@@ -1,4 +1,5 @@
 import re
+import operator
 from bson.son import SON
 from pymongo import MongoClient
 import requests
@@ -26,11 +27,33 @@ def main():
     set_links = {}
     search(url, keyword, set_links, depth)
 
-    q = collections.find({'words': {'$elemMatch': {'percent': {'$gte': 5.000}, 'keyword': keyword}}})
+    q = collections.find({'words': {'$elemMatch': {'keyword': keyword}}})
 
     print('\nAchamos que os links abaixo podem ser relevantes: ')
+    links = {}
+
     for query in q:
-        print(query['link'])
+        links[query['link']] = query['words'][0]['percent']
+
+    sorted_d = sorted(links.items(), key=operator.itemgetter(1), reverse=True)
+
+    show_links(sorted_d)
+
+
+def show_links(sorted_d):
+    i = 0
+    if len(sorted_d) >= 15:
+        for item in sorted_d:
+            if i < 15:
+
+                print('%d: %s' % (i + 1, item[0]))
+            else:
+                break
+            i += 1
+    else:
+        for item in sorted_d:
+            print('%d: %s' % (i + 1, item[0]))
+            i += 1
 
 
 def handle_input(msg):
@@ -89,13 +112,16 @@ def handle_text(body):
 def search(url, keyword, visited, max_depth=3, depth=0):
     if depth < max_depth:
         try:
-            soup = BeautifulSoup(requests.get(url, allow_redirects=False).text, 'html.parser')
+            soup = BeautifulSoup(requests.get(url, allow_redirects=True).text, 'html.parser')
 
             # Remove the javascript of the body (most of them I hope)
             for script in soup.find_all('script', src=False):
                 script.decompose()
 
             words = handle_text(soup.get_text())
+
+            print(url)
+            print(words)
             total = sum(words.values())
             amount = words[keyword] if keyword in words.keys() else 0
             percent = amount / total * 100 if amount != 0 else 0
